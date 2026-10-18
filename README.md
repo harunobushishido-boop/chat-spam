@@ -15,7 +15,7 @@
 
 ## GitHub Pages で公開
 
-公開URL：<https://harunobushishido-boop.github.io/chat-spam/>
+公開予定URL（GitHub Pagesの初回設定後）：<https://harunobushishido-boop.github.io/chat-spam/>
 
 初回公開時は、リポジトリの [Settings → Pages](https://github.com/harunobushishido-boop/chat-spam/settings/pages) を開き、**Build and deployment → Source → GitHub Actions** を選択してください。その後、[Actions](https://github.com/harunobushishido-boop/chat-spam/actions) で公開ワークフローが成功していることを確認します。Pagesの初期設定がまだの場合、公開URLは動きません。
 
