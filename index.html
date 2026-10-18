@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="日本語の最新ニュースを自動取得して流す、ライブ配信・OBS向け1980×50pxニュース速報弾幕。">
+  <meta name="description" content="GitHub Actionsが定期取得する日本語ニュースを流す、ライブ配信・OBS向け1980×50pxニュース速報弾幕。">
   <title>ニュース速報弾幕 | Chat Spam</title>
   <style>
     :root {
@@ -16,6 +16,7 @@
       --accent: #8bd7ff;
       --breaking: #ff3f52;
       --gold: #ffd166;
+      --warn: #ffb3a8;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -65,6 +66,7 @@
     .source { color: var(--muted); font-size: 12px; font-weight: 650; }
     .updated { color: var(--muted); font-size: 12px; font-weight: 600; }
     .status { color: #dce9f8; font-size: 14px; font-weight: 650; }
+    .stale { color: var(--warn); font-size: 12px; font-weight: 800; }
     @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     @keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
     @media (prefers-reduced-motion: reduce) { .track { animation-duration: 240s; } .live-dot { animation: none; } }
@@ -76,31 +78,26 @@
       <div class="ticker-copy" id="copy-a">
         <span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>
         <span class="breaking"><span class="live-dot"></span>最新ニュース</span>
-        <span class="status" id="status">最新ニュースを取得しています…</span>
+        <span class="status" id="status">GitHubからニュースを読み込んでいます…</span>
       </div>
       <div class="ticker-copy" id="copy-b" aria-hidden="true">
         <span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>
         <span class="breaking"><span class="live-dot"></span>最新ニュース</span>
-        <span class="status">最新ニュースを取得しています…</span>
+        <span class="status">GitHubからニュースを読み込んでいます…</span>
       </div>
     </div>
   </main>
   <script>
     (function () {
       "use strict";
-      const GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
-      const GOOGLE_RSS_URL = "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja";
-      const UPDATE_MS = 5 * 60 * 1000;
-      const MAX_HEADLINES = 24;
+      const NEWS_URL = new URL("./news.json", location.href);
+      const UPDATE_INTERVAL_MS = 60 * 1000;
+      const MAX_HEADLINES = 45;
       const copyA = document.getElementById("copy-a");
       const copyB = document.getElementById("copy-b");
       const track = document.getElementById("track");
-      const status = document.getElementById("status");
       let isLoading = false;
-      let lastFetchedAt = null;
-      let previousArticles = [];
-      let activeSource = "GDELT";
-      let retryTimer = null;
+      let previousSignature = "";
 
       function escapeHtml(value) {
         return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -113,192 +110,100 @@
           return (url.protocol === "https:" || url.protocol === "http:") ? url.href : "";
         } catch (error) { return ""; }
       }
-      function parseDate(value) {
-        if (!value) return null;
-        const str = String(value).trim();
-        const gdelt = str.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
-        if (gdelt) return new Date(Date.UTC(+gdelt[1], +gdelt[2]-1, +gdelt[3], +gdelt[4], +gdelt[5], +gdelt[6]));
-        const date = new Date(str);
-        return Number.isNaN(date.getTime()) ? null : date;
-      }
       function formatTime(value) {
-        const date = parseDate(value);
-        if (!date) return "最新";
+        if (!value) return "時刻不明";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "時刻不明";
         return new Intl.DateTimeFormat("ja-JP", {
           timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
         }).format(date);
       }
-      function dedupe(articles) {
+      function safeArticles(data) {
+        if (!data || !Array.isArray(data.articles)) return [];
         const seen = new Set();
-        return articles.filter(function (article) {
-          article.title = String(article.title || "").replace(/\s+/g, " ").trim();
-          article.url = safeUrl(article.url);
-          if (!article.title || article.title.length < 6 || !article.url) return false;
-          const key = article.url.toLowerCase() || article.title.toLowerCase();
+        return data.articles.map(function (item) {
+          return {
+            title: String(item.title || "").replace(/\s+/g, " ").trim(),
+            url: safeUrl(item.url),
+            source: String(item.source || item.domain || "ニュース配信元").slice(0, 100),
+            domain: String(item.domain || "").slice(0, 100),
+            publishedAt: item.publishedAt || null
+          };
+        }).filter(function (item) {
+          if (!item.title || item.title.length < 6 || !item.url) return false;
+          const key = item.url.toLowerCase();
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
         }).slice(0, MAX_HEADLINES);
       }
-      function normalizeGdelt(data) {
-        const items = data && Array.isArray(data.articles) ? data.articles : [];
-        return dedupe(items.map(function (item) {
-          return {
-            title: item.title || "",
-            url: item.url || "",
-            domain: String(item.domain || "").replace(/^www\./i, ""),
-            date: item.seendate || ""
-          };
-        }));
-      }
-      function parseGoogleRss(xmlText) {
-        const xml = new DOMParser().parseFromString(String(xmlText || ""), "application/xml");
-        if (xml.querySelector("parsererror")) throw new Error("RSS XML parse error");
-        const items = Array.from(xml.querySelectorAll("item")).map(function (item) {
-          const title = item.querySelector("title");
-          const link = item.querySelector("link");
-          const date = item.querySelector("pubDate");
-          const source = item.querySelector("source");
-          const url = link ? link.textContent.trim() : "";
-          let domain = source ? source.textContent.trim() : "";
-          if (!domain && url) { try { domain = new URL(url).hostname.replace(/^www\./i, ""); } catch (error) {} }
-          return { title: title ? title.textContent : "", url: url, domain: domain || "Google News", date: date ? date.textContent : "" };
-        });
-        return dedupe(items);
-      }
-
-      function requestGdeltJsonp(query, timespan, maxRecords) {
-        return new Promise(function (resolve, reject) {
-          const callbackName = "__chatSpamNewsCallback";
-          const previousCallback = window[callbackName];
-          const script = document.createElement("script");
-          const url = new URL(GDELT_URL);
-          let settled = false;
-          const timeoutId = window.setTimeout(function () {
-            finish(new Error("GDELT response timed out"));
-          }, 12000);
-
-          function finish(error, data) {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timeoutId);
-            script.onerror = null;
-            script.onload = null;
-            if (script.parentNode) script.parentNode.removeChild(script);
-            if (previousCallback === undefined) {
-              try { delete window[callbackName]; } catch (ignored) { window[callbackName] = undefined; }
-            } else window[callbackName] = previousCallback;
-            if (error) reject(error); else resolve(data);
-          }
-
-          url.search = new URLSearchParams({
-            query: query,
-            mode: "ArtList",
-            format: "JSONP",
-            callback: callbackName,
-            sort: "DateDesc",
-            timespan: timespan,
-            maxrecords: String(maxRecords)
-          }).toString();
-          window[callbackName] = function (data) { finish(null, data); };
-          script.async = true;
-          script.src = url.toString();
-          script.onerror = function () { finish(new Error("GDELT script request failed")); };
-          document.head.appendChild(script);
-        });
-      }
-
-      async function fetchGoogleRss() {
-        const proxyA = "https://api.allorigins.win/get?url=" + encodeURIComponent(GOOGLE_RSS_URL) + "&disableCache=true";
-        try {
-          const response = await fetch(proxyA, { cache: "no-store", signal: AbortSignal.timeout(10000) });
-          if (!response.ok) throw new Error("RSS proxy A HTTP " + response.status);
-          const envelope = await response.json();
-          const articles = parseGoogleRss(envelope.contents || "");
-          if (articles.length) { activeSource = "Google News RSS"; return articles; }
-          throw new Error("RSS proxy A returned no articles");
-        } catch (error) {
-          console.warn("First RSS route failed:", error);
-        }
-        const proxyB = "https://corsproxy.io/?url=" + encodeURIComponent(GOOGLE_RSS_URL);
-        const response = await fetch(proxyB, { cache: "no-store", signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error("RSS proxy B HTTP " + response.status);
-        const articles = parseGoogleRss(await response.text());
-        if (!articles.length) throw new Error("RSS proxy B returned no articles");
-        activeSource = "Google News RSS";
-        return articles;
-      }
-
-      function render(articles, stale) {
+      function render(data) {
+        const articles = safeArticles(data);
         const parts = [
           '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>',
           '<span class="breaking"><span class="live-dot"></span>最新ニュース</span>',
           '<span class="separator"></span>'
         ];
-        articles.forEach(function (article, index) {
-          if (index) parts.push('<span class="separator"></span>');
-          const title = article.title.length > 200 ? article.title.slice(0, 197) + "…" : article.title;
-          parts.push(
-            '<span class="item">' +
-              '<span class="time">' + escapeHtml(formatTime(article.date)) + '</span>' +
+        if (articles.length) {
+          articles.forEach(function (article, index) {
+            if (index) parts.push('<span class="separator"></span>');
+            const title = article.title.length > 200 ? article.title.slice(0, 197) + "…" : article.title;
+            parts.push('<span class="item">' +
+              '<span class="time">' + escapeHtml(formatTime(article.publishedAt)) + '</span>' +
               '<a class="headline" href="' + escapeHtml(article.url) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</a>' +
-              '<span class="source">' + escapeHtml(article.domain || activeSource) + '</span>' +
-            '</span>'
-          );
-        });
-        const fetchTime = lastFetchedAt ? formatTime(lastFetchedAt.toISOString()) : "—";
+              '<span class="source">' + escapeHtml(article.source || article.domain || "") + '</span>' +
+              '</span>');
+          });
+        } else {
+          parts.push('<span class="status">ニュースはまだありません。GitHub Actionsの取得処理を確認してください。</span>');
+        }
+
         parts.push('<span class="separator"></span>');
-        parts.push('<span class="updated">' + (stale ? "更新失敗・前回のニュースを表示中" : "取得 " + escapeHtml(fetchTime) + " JST") + '</span>');
-        parts.push('<span class="source">情報源：' + escapeHtml(activeSource) + '／掲載元リンク</span>');
+        if (data && data.stale) {
+          parts.push('<span class="stale">ニュース更新に失敗・前回データを表示中</span>');
+        }
+        parts.push('<span class="updated">取得 ' + escapeHtml(formatTime(data && data.updatedAt)) + ' JST</span>');
+        parts.push('<span class="updated">GitHub確認 ' + escapeHtml(formatTime(data && data.checkedAt)) + ' JST</span>');
+        parts.push('<span class="source">データ：' + escapeHtml(data && data.source || "ニュース取得元") + '</span>');
+
         const markup = parts.join("");
         copyA.innerHTML = markup;
         copyB.innerHTML = markup;
         requestAnimationFrame(function () {
           const width = copyA.getBoundingClientRect().width;
-          track.style.animationDuration = Math.max(90, Math.min(220, width / 55)) + "s";
+          track.style.animationDuration = Math.max(90, Math.min(240, width / 55)) + "s";
         });
       }
 
-      async function fetchNews() {
+      async function fetchPublishedNews() {
         if (isLoading) return;
         isLoading = true;
-        if (!previousArticles.length) {
-          const initial = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="breaking">最新ニュース</span><span class="status">ニュースを取得しています…</span>';
-          copyA.innerHTML = initial;
-          copyB.innerHTML = initial;
-        }
         try {
-          let articles = [];
-          try {
-            const first = await requestGdeltJsonp('sourcelang:japanese', '6h', 30);
-            articles = normalizeGdelt(first);
-            if (articles.length) activeSource = "GDELT";
-          } catch (error) {
-            console.warn("GDELT route failed:", error);
+          const url = new URL(NEWS_URL.href);
+          url.searchParams.set("t", String(Date.now()));
+          const response = await fetch(url.href, { cache: "no-store" });
+          if (!response.ok) throw new Error("news.json returned HTTP " + response.status);
+          const data = await response.json();
+          if (!data || !Array.isArray(data.articles)) throw new Error("news.json format is invalid");
+          const signature = JSON.stringify(data);
+          if (signature !== previousSignature) {
+            previousSignature = signature;
+            render(data);
           }
-          if (!articles.length) articles = await fetchGoogleRss();
-          if (!articles.length) throw new Error("No news items received");
-          previousArticles = articles;
-          lastFetchedAt = new Date();
-          render(previousArticles, false);
         } catch (error) {
-          console.error("All news sources failed:", error);
-          if (previousArticles.length) {
-            render(previousArticles, true);
-          } else {
-            const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="breaking">最新ニュース</span><span class="status">ニュース取得に失敗しました。20秒後に再試行します。</span><span class="source">GDELT・Google News RSS</span>';
+          console.error("Could not load published news.json:", error);
+          if (!previousSignature) {
+            const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="breaking">最新ニュース</span><span class="status">ニュースデータを読み込めません。GitHub Actionsの実行状況を確認してください。</span>';
             copyA.innerHTML = message;
             copyB.innerHTML = message;
-            window.clearTimeout(retryTimer);
-            retryTimer = window.setTimeout(fetchNews, 20000);
           }
         } finally {
           isLoading = false;
         }
       }
 
-      fetchNews();
-      window.setInterval(fetchNews, UPDATE_MS);
+      fetchPublishedNews();
+      window.setInterval(fetchPublishedNews, UPDATE_INTERVAL_MS);
     }());
   </script>
 </body>
