@@ -4,17 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="ライブ配信の下に配置できる、最新の天気予報を表示する横1980×縦50ピクセルの天気弾幕。">
-  <title>最新天気予報 弾幕 | Chat Spam</title>
+  <meta name="description" content="全国12都市の最新天気をニュース形式で流す、ライブ配信・OBS向け横1980×縦50pxの天気弾幕。">
+  <title>全国の天気ニュース弾幕 | Chat Spam</title>
   <style>
     :root {
       color-scheme: dark;
-      --bar-bg: rgba(7, 20, 38, .96);
-      --bar-line: rgba(115, 190, 255, .34);
-      --text: #f4f8ff;
-      --muted: #a9c3df;
-      --accent: #67d7ff;
+      --bar-bg: rgba(5, 16, 31, .97);
+      --bar-line: rgba(100, 190, 255, .38);
+      --text: #f3f8ff;
+      --muted: #aac3dd;
+      --accent: #71ddff;
       --warm: #ffd166;
+      --alert: #ffad9e;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -39,7 +40,7 @@
       background: var(--bar-bg);
       border-top: 1px solid var(--bar-line);
       border-bottom: 1px solid var(--bar-line);
-      box-shadow: 0 2px 14px rgba(0, 0, 0, .22);
+      box-shadow: 0 2px 14px rgba(0, 0, 0, .25);
     }
     .weather-bar::before, .weather-bar::after {
       content: "";
@@ -47,16 +48,16 @@
       z-index: 2;
       top: 0;
       bottom: 0;
-      width: 42px;
+      width: 32px;
       pointer-events: none;
     }
     .weather-bar::before {
       left: 0;
-      background: linear-gradient(90deg, rgba(7,20,38,1), rgba(7,20,38,0));
+      background: linear-gradient(90deg, rgba(5,16,31,1), rgba(5,16,31,0));
     }
     .weather-bar::after {
       right: 0;
-      background: linear-gradient(270deg, rgba(7,20,38,1), rgba(7,20,38,0));
+      background: linear-gradient(270deg, rgba(5,16,31,1), rgba(5,16,31,0));
     }
     .track {
       display: flex;
@@ -65,7 +66,7 @@
       width: max-content;
       min-width: max-content;
       height: 100%;
-      animation: ticker-scroll 76s linear infinite;
+      animation: ticker-scroll 95s linear infinite;
       will-change: transform;
     }
     .weather-bar:hover .track { animation-play-state: paused; }
@@ -73,13 +74,13 @@
       display: flex;
       flex: 0 0 auto;
       align-items: center;
-      gap: 28px;
+      gap: 25px;
       height: 100%;
-      padding: 0 26px;
+      padding: 0 24px;
       white-space: nowrap;
-      font-size: 19px;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: .02em;
+      letter-spacing: .015em;
       line-height: 1;
     }
     .brand {
@@ -87,36 +88,47 @@
       align-items: center;
       gap: 8px;
       color: var(--accent);
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 900;
-      letter-spacing: .08em;
+      letter-spacing: .06em;
     }
     .brand-icon {
       display: inline-grid;
       place-items: center;
-      width: 28px;
-      height: 28px;
+      width: 29px;
+      height: 29px;
       border-radius: 9px;
       background: linear-gradient(135deg, #174a85, #167c9e);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
       font-size: 18px;
     }
-    .item { display: inline-flex; align-items: center; gap: 8px; }
+    .breaking {
+      color: #071426;
+      background: var(--warm);
+      border-radius: 4px;
+      padding: 6px 9px;
+      font-size: 13px;
+      font-weight: 950;
+      letter-spacing: .04em;
+    }
+    .item { display: inline-flex; align-items: center; gap: 7px; }
     .separator {
       display: inline-block;
       width: 1px;
       height: 22px;
       background: linear-gradient(transparent, rgba(130,178,220,.55), transparent);
     }
-    .city { color: var(--accent); }
-    .condition-icon { font-size: 25px; }
-    .temperature { color: var(--warm); font-size: 23px; font-weight: 900; }
-    .label { color: var(--muted); font-size: 15px; font-weight: 600; }
-    .forecast-day { color: #d8e8fa; }
+    .headline { color: #f6f9ff; font-weight: 800; }
+    .region { color: var(--accent); font-weight: 900; }
+    .city { color: #d7eaff; }
+    .condition-icon { font-size: 22px; }
+    .temperature { color: var(--warm); font-size: 19px; font-weight: 950; }
     .forecast-temp { color: var(--warm); }
-    .updated { color: var(--muted); font-size: 13px; font-weight: 500; }
-    .status { color: #d5e7f8; font-size: 15px; font-weight: 600; }
-    .source { color: #8ca9c8; font-size: 12px; font-weight: 500; }
+    .label { color: var(--muted); font-size: 13px; font-weight: 650; }
+    .rain-alert { color: var(--alert); }
+    .updated { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .source { color: #8ba9c7; font-size: 11px; font-weight: 500; }
+    .status { color: #d5e7f8; font-size: 14px; font-weight: 650; }
     @keyframes ticker-scroll {
       from { transform: translateX(0); }
       to { transform: translateX(-50%); }
@@ -127,33 +139,46 @@
   </style>
 </head>
 <body>
-  <main class="weather-bar" aria-label="最新の天気予報">
+  <main class="weather-bar" aria-label="全国の最新天気ニュース">
     <div class="track" id="track">
       <div class="ticker-copy" id="copy-a">
-        <span class="brand"><span class="brand-icon">☁</span> LIVE WEATHER</span>
-        <span class="status" id="status">最新の天気を取得しています…</span>
+        <span class="brand"><span class="brand-icon">☁</span> WEATHER NEWS JAPAN</span>
+        <span class="status" id="status">全国の最新天気を取得しています…</span>
       </div>
       <div class="ticker-copy" id="copy-b" aria-hidden="true">
-        <span class="brand"><span class="brand-icon">☁</span> LIVE WEATHER</span>
-        <span class="status">最新の天気を取得しています…</span>
+        <span class="brand"><span class="brand-icon">☁</span> WEATHER NEWS JAPAN</span>
+        <span class="status">全国の最新天気を取得しています…</span>
       </div>
     </div>
   </main>
   <script>
     (function () {
       "use strict";
-      const params = new URLSearchParams(location.search);
-      const latValue = Number(params.get("lat"));
-      const lonValue = Number(params.get("lon"));
-      const latitude = Number.isFinite(latValue) && params.has("lat") ? latValue : 38.2682;
-      const longitude = Number.isFinite(lonValue) && params.has("lon") ? lonValue : 140.8694;
-      const city = (params.get("city") || "仙台市").slice(0, 24);
+
+      // 北海道から沖縄まで、全国の天気を代表する12都市
+      const cities = [
+        { name: "札幌", region: "北海道", lat: 43.0642, lon: 141.3469 },
+        { name: "青森", region: "東北", lat: 40.8246, lon: 140.7406 },
+        { name: "仙台", region: "東北", lat: 38.2682, lon: 140.8721 },
+        { name: "新潟", region: "北陸", lat: 37.9026, lon: 139.0236 },
+        { name: "東京", region: "関東", lat: 35.6762, lon: 139.6503 },
+        { name: "名古屋", region: "東海", lat: 35.1815, lon: 136.9066 },
+        { name: "大阪", region: "近畿", lat: 34.6937, lon: 135.5023 },
+        { name: "広島", region: "中国", lat: 34.3853, lon: 132.4553 },
+        { name: "高知", region: "四国", lat: 33.5597, lon: 133.5311 },
+        { name: "福岡", region: "九州", lat: 33.5902, lon: 130.4017 },
+        { name: "鹿児島", region: "九州", lat: 31.5966, lon: 130.5571 },
+        { name: "那覇", region: "沖縄", lat: 26.2124, lon: 127.6809 }
+      ];
       const copyA = document.getElementById("copy-a");
       const copyB = document.getElementById("copy-b");
       const track = document.getElementById("track");
       const status = document.getElementById("status");
+      let lastSuccessfulUpdate = null;
+      let isLoading = false;
+
       const weatherText = {
-        0: ["快晴", "☀️"], 1: ["おおむね晴れ", "🌤️"], 2: ["一部くもり", "⛅"], 3: ["くもり", "☁️"],
+        0: ["快晴", "☀️"], 1: ["おおむね晴れ", "🌤️"], 2: ["晴れ時々くもり", "⛅"], 3: ["くもり", "☁️"],
         45: ["霧", "🌫️"], 48: ["霧氷を伴う霧", "🌫️"],
         51: ["弱い霧雨", "🌦️"], 53: ["霧雨", "🌦️"], 55: ["強い霧雨", "🌧️"],
         56: ["凍る弱い霧雨", "🌧️"], 57: ["凍る霧雨", "🌧️"],
@@ -170,72 +195,126 @@
         });
       };
       const weather = function (code) {
-        return weatherText[code] || ["天気情報", "🌤️"];
+        return weatherText[Number(code)] || ["天気情報", "🌤️"];
       };
       const round = function (value) {
-        return Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—";
+        return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—";
       };
-      const weekday = function (dateString, index) {
-        if (index === 0) return "今日";
-        if (index === 1) return "明日";
-        const d = new Date(dateString + "T12:00:00+09:00");
-        return ["日", "月", "火", "水", "木", "金", "土"][d.getDay()] + "曜日";
+      const num = function (value) {
+        return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : null;
       };
-      function buildMarkup(data) {
-        const now = data.current || {};
-        const todayWeather = weather(now.weather_code);
+      const isRainOrSnow = function (code) {
+        return [51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99].includes(Number(code));
+      };
+      const isAlert = function (code) {
+        return [65,67,75,82,86,95,96,99].includes(Number(code));
+      };
+      const fmtTime = function (value) {
+        if (!value) return "時刻不明";
+        const match = String(value).match(/T(\d{2}:\d{2})/);
+        return match ? match[1] : "時刻不明";
+      };
+      function buildMarkup(results) {
+        const valid = results.filter(function (r) { return r && r.current && r.daily && r.daily.time; });
+        if (!valid.length) throw new Error("weather data unavailable");
+
+        const wetNow = valid.filter(function (r) { return isRainOrSnow(r.current.weather_code); });
+        const alertNow = valid.filter(function (r) { return isAlert(r.current.weather_code); });
+        const rainRisk = valid.filter(function (r) {
+          const p = num(r.daily.precipitation_probability_max && r.daily.precipitation_probability_max[0]);
+          return p !== null && p >= 40;
+        });
+        const maxCity = valid.slice().sort(function (a, b) {
+          return (num(b.daily.temperature_2m_max && b.daily.temperature_2m_max[0]) ?? -999) -
+                 (num(a.daily.temperature_2m_max && a.daily.temperature_2m_max[0]) ?? -999);
+        })[0];
+        const minCity = valid.slice().sort(function (a, b) {
+          return (num(a.daily.temperature_2m_min && a.daily.temperature_2m_min[0]) ?? 999) -
+                 (num(b.daily.temperature_2m_min && b.daily.temperature_2m_min[0]) ?? 999);
+        })[0];
+
         const parts = [];
-        parts.push('<span class="brand"><span class="brand-icon">☁</span> LIVE WEATHER</span>');
+        parts.push('<span class="brand"><span class="brand-icon">☁</span> WEATHER NEWS JAPAN</span>');
+        parts.push('<span class="breaking">全国の天気 NEWS</span>');
         parts.push('<span class="separator"></span>');
-        parts.push('<span class="item"><span class="city">' + safe(city) + '</span><span class="condition-icon">' + todayWeather[1] + '</span><span>' + safe(todayWeather[0]) + '</span></span>');
-        parts.push('<span class="item"><span class="temperature">' + safe(round(now.temperature_2m)) + '℃</span><span class="label">現在</span></span>');
-        parts.push('<span class="item"><span class="label">体感</span><span>' + safe(round(now.apparent_temperature)) + '℃</span></span>');
-        parts.push('<span class="item"><span class="label">湿度</span><span>' + safe(round(now.relative_humidity_2m)) + '%</span></span>');
-        parts.push('<span class="item"><span class="label">降水</span><span>' + safe(round(now.precipitation)) + ' mm</span></span>');
-        parts.push('<span class="item"><span class="label">風速</span><span>' + safe(round(now.wind_speed_10m)) + ' km/h</span></span>');
-        const daily = data.daily || {};
-        const dates = daily.time || [];
-        for (let i = 0; i < Math.min(3, dates.length); i++) {
-          const w = weather(daily.weather_code && daily.weather_code[i]);
-          parts.push('<span class="separator"></span>');
-          parts.push('<span class="item forecast-day"><span>' + safe(weekday(dates[i], i)) + '</span><span class="condition-icon">' + w[1] + '</span><span>' + safe(w[0]) + '</span><span class="forecast-temp">' + safe(round(daily.temperature_2m_min && daily.temperature_2m_min[i])) + '〜' + safe(round(daily.temperature_2m_max && daily.temperature_2m_max[i])) + '℃</span><span class="label">降水確率 ' + safe(round(daily.precipitation_probability_max && daily.precipitation_probability_max[i])) + '%</span></span>');
+        parts.push('<span class="headline">全国12都市の最新概況</span>');
+        parts.push('<span class="item"><span class="label">現在、雨・雪</span><span class="' + (wetNow.length ? 'rain-alert' : '') + '">' + wetNow.length + '都市</span></span>');
+        parts.push('<span class="item"><span class="label">きょう降水確率40%以上</span><span class="' + (rainRisk.length ? 'rain-alert' : '') + '">' + rainRisk.length + '都市</span></span>');
+        parts.push('<span class="item"><span class="label">予想最高気温</span><span class="city">' + safe(maxCity.name) + '</span><span class="temperature">' + safe(round(maxCity.daily.temperature_2m_max[0])) + '℃</span></span>');
+        parts.push('<span class="item"><span class="label">予想最低気温</span><span class="city">' + safe(minCity.name) + '</span><span class="temperature">' + safe(round(minCity.daily.temperature_2m_min[0])) + '℃</span></span>');
+        if (alertNow.length) {
+          parts.push('<span class="item rain-alert"><span>注意：</span><span>' + safe(alertNow.map(function (r) { return r._city.name; }).join("・")) + 'で強い雨・雪・雷の情報</span></span>');
         }
-        const update = now.time ? new Date(now.time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }) : "—";
+        const regionOrder = ["北海道", "東北", "北陸", "関東", "東海", "近畿", "中国", "四国", "九州", "沖縄"];
+        regionOrder.forEach(function (region) {
+          const list = valid.filter(function (r) { return r._city.region === region; });
+          if (!list.length) return;
+          parts.push('<span class="separator"></span>');
+          parts.push('<span class="region">【' + safe(region) + '】</span>');
+          list.forEach(function (r) {
+            const current = r.current;
+            const w = weather(current.weather_code);
+            const pop = num(r.daily.precipitation_probability_max && r.daily.precipitation_probability_max[0]);
+            const alertClass = (pop !== null && pop >= 50) || isAlert(current.weather_code) ? " rain-alert" : "";
+            parts.push('<span class="item"><span class="city">' + safe(r._city.name) + '</span><span class="condition-icon">' + w[1] + '</span><span>' + safe(w[0]) + '</span><span class="temperature">' + safe(round(current.temperature_2m)) + '℃</span><span class="label">最高' + safe(round(r.daily.temperature_2m_max[0])) + '°／最低' + safe(round(r.daily.temperature_2m_min[0])) + '°</span><span class="label' + alertClass + '">降水' + safe(round(pop)) + '%</span></span>');
+          });
+        });
+        const nowTime = valid[0].current.time || "";
+        const update = fmtTime(nowTime);
         parts.push('<span class="separator"></span>');
-        parts.push('<span class="updated">更新 ' + safe(update) + '（10分ごとに自動更新）</span>');
+        parts.push('<span class="updated">最新データ ' + safe(update) + '・10分ごとに自動更新</span>');
         parts.push('<span class="source">Weather data: Open-Meteo</span>');
+
         const markup = parts.join("");
         copyA.innerHTML = markup;
         copyB.innerHTML = markup;
-        status.textContent = "天気情報を表示中";
+        status.textContent = "全国の天気ニュースを表示中";
+        lastSuccessfulUpdate = Date.now();
         requestAnimationFrame(function () {
           const width = copyA.getBoundingClientRect().width;
-          track.style.animationDuration = Math.max(42, Math.min(120, width / 28)) + "s";
+          track.style.animationDuration = Math.max(70, Math.min(180, width / 26)) + "s";
         });
       }
+
       async function loadWeather() {
-        status.textContent = "最新の天気を取得しています…";
+        if (isLoading) return;
+        isLoading = true;
+        if (!lastSuccessfulUpdate) status.textContent = "全国の最新天気を取得しています…";
         const url = new URL("https://api.open-meteo.com/v1/forecast");
         url.search = new URLSearchParams({
-          latitude: String(latitude),
-          longitude: String(longitude),
+          latitude: cities.map(function (c) { return c.lat; }).join(","),
+          longitude: cities.map(function (c) { return c.lon; }).join(","),
           current: "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",
           daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-          forecast_days: "3",
+          forecast_days: "2",
           timezone: "Asia/Tokyo"
         }).toString();
         try {
           const response = await fetch(url.toString(), { cache: "no-store" });
           if (!response.ok) throw new Error("weather request failed: " + response.status);
-          const data = await response.json();
-          if (!data.current || !data.daily) throw new Error("weather response incomplete");
-          buildMarkup(data);
+          const raw = await response.json();
+          const results = Array.isArray(raw) ? raw : [raw];
+          results.forEach(function (r, i) { r._city = cities[i]; });
+          if (results.length !== cities.length || results.some(function (r) { return !r || !r.current || !r.daily; })) {
+            throw new Error("incomplete nationwide forecast");
+          }
+          buildMarkup(results);
         } catch (error) {
-          const message = '<span class="brand"><span class="brand-icon">☁</span> LIVE WEATHER</span><span class="separator"></span><span class="status">' + safe(city) + '：天気情報を取得できませんでした。接続を確認して再取得します。</span><span class="source">Weather data: Open-Meteo</span>';
-          copyA.innerHTML = message;
-          copyB.innerHTML = message;
+          console.error("Nationwide weather update failed:", error);
+          if (lastSuccessfulUpdate) {
+            const warning = '<span class="separator"></span><span class="status rain-alert">更新に失敗しました。表示中の天気は前回取得時の情報です。</span>';
+            copyA.insertAdjacentHTML("beforeend", warning);
+            copyB.insertAdjacentHTML("beforeend", warning);
+          } else {
+            const message = '<span class="brand"><span class="brand-icon">☁</span> WEATHER NEWS JAPAN</span><span class="separator"></span><span class="status">全国の天気データを取得できません。ネット接続を確認し、自動再取得をお待ちください。</span><span class="source">Weather data: Open-Meteo</span>';
+            copyA.innerHTML = message;
+            copyB.innerHTML = message;
+          }
+        } finally {
+          isLoading = false;
         }
       }
+
       loadWeather();
       window.setInterval(loadWeather, 10 * 60 * 1000);
     }());
