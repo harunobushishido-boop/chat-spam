@@ -120,8 +120,9 @@
       }
       function safeArticles(data) {
         if (!data || !Array.isArray(data.articles)) return [];
-        const seen = new Set();
-        return data.articles.map(function (item) {
+        // Sort in the browser too, so the ticker stays newest-to-oldest even
+        // if the published JSON arrives in an unexpected order.
+        const candidates = data.articles.map(function (item) {
           return {
             title: String(item.title || "").replace(/\s+/g, " ").trim(),
             url: safeUrl(item.url),
@@ -130,7 +131,20 @@
             publishedAt: item.publishedAt || null
           };
         }).filter(function (item) {
-          if (!item.title || item.title.length < 6 || !item.url) return false;
+          return !!item.title && item.title.length >= 6 && !!item.url;
+        }).sort(function (a, b) {
+          const aTime = a.publishedAt ? Date.parse(a.publishedAt) : NaN;
+          const bTime = b.publishedAt ? Date.parse(b.publishedAt) : NaN;
+          const aValid = Number.isFinite(aTime);
+          const bValid = Number.isFinite(bTime);
+          if (aValid && bValid) return bTime - aTime;
+          if (aValid) return -1; // Put articles without a date at the end.
+          if (bValid) return 1;
+          return 0;
+        });
+
+        const seen = new Set();
+        return candidates.filter(function (item) {
           const key = item.url.toLowerCase();
           if (seen.has(key)) return false;
           seen.add(key);
