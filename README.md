@@ -1,41 +1,42 @@
-# Chat Spam｜リアルタイムニュース速報弾幕
+# Chat Spam｜全国の天気予報弾幕
 
-ライブ配信の下の隙間に配置する、横 **1980 × 縦 50 ピクセル** のニュース速報ティッカーです。日本語のニュース見出し、掲載時刻、配信元を右から左へ流します。
+ライブ配信の下の隙間に配置する、横 **1980 × 縦 50 ピクセル** の天気予報ティッカーです。北海道から沖縄まで全国12都市の天気を右から左へ流して表示します。
 
-## ニュース取得と予備ルート
+## 表示する内容
 
-ニュースデータが1つのサービスで取得できない場合に備え、取得経路を複数用意しています。
+- 全国12都市の現在の天気・気温
+- 今日の予想最高気温・最低気温・降水確率
+- 現在雨・雪の地点数と、降水確率が高い都市の数
+- 取得日時（このページがAPIからデータを受け取った時刻、日本時間）
+- APIデータ時刻（天気APIが返したデータの時刻、日本時間）
 
-1. **GDELT DOC API**：JSONPでニュース記事を取得
-2. **Google News RSS**：GDELTが失敗した場合にRSSを取得
-3. **予備のRSSプロキシ**：Google News RSSの1つ目の取得経路も失敗したときに再試行
+**取得日時とAPIデータ時刻は別です。** 取得日時はブラウザーが応答を受け取った瞬間に計測し、日本時間（Asia/Tokyo）で表示します。APIデータ時刻は、タイムゾーン情報のないOpen-Meteoの現地時刻文字列をJavaScriptのDateに直接渡さず、そのまま日本時間として表示します。これによりブラウザーやOBSの環境によるタイムゾーン変換のずれを避けます。
 
-- 5分ごとにニュースAPIを確認します。
-- 最初の取得が失敗した場合は20秒後に自動再試行します。
-- 取得に失敗しても前回のニュースを消さず、再取得を試みます。
-- プロキシを含む外部サービスは、障害や利用制限によって一時的に取得できない場合があります。
-- 「5分ごとに更新」は確認間隔であり、ニュース掲載直後の反映を保証するものではありません。
+## データ取得・自動更新
+
+- API：<https://open-meteo.com/>
+- API URL：`https://api.open-meteo.com/v1/forecast`
+- APIキー不要
+- 全国12都市をまとめて1回のリクエストで取得
+- 10分ごとに自動更新
+- 初回取得が失敗した場合は20秒後に再試行
+- 更新に失敗しても、直前に取得した天気を画面に残す
+
+このページは、札幌・青森・仙台・新潟・東京・名古屋・大阪・広島・高知・福岡・鹿児島・那覇の予報を使って全国概況を表示します。日本のすべての市区町村を網羅したものではありません。APIデータ時刻は予報データの時刻であり、取得日時とは一致しないことがあります。
 
 ## GitHub Pagesで公開
 
-公開予定URL（GitHub Pagesの初回設定後）：<https://harunobushishido-boop.github.io/chat-spam/>
+公開URL：<https://harunobushishido-boop.github.io/chat-spam/>
 
-初回公開時は、リポジトリの [Settings → Pages](https://github.com/harunobushishido-boop/chat-spam/settings/pages) を開き、**Build and deployment → Source → GitHub Actions** を選択してください。その後、[Actions](https://github.com/harunobushishido-boop/chat-spam/actions) で公開ワークフローが成功していることを確認します。Pagesの初期設定がまだの場合、公開URLは動きません。
+公開処理は、リポジトリの `main` ブランチを更新するとGitHub Actionsで実行します。公開状況は[Actions](https://github.com/harunobushishido-boop/chat-spam/actions)で確認できます。
 
 ## OBSなどの配信ソフトで使う
 
-1. 「ブラウザソース」を追加します。
-2. URLに <https://harunobushishido-boop.github.io/chat-spam/> を入力します。
-3. 幅を `1980`、高さを `50` に設定します。
-4. 配信画面の下の隙間へ配置します。
-
-HTML自体の高さは常に50pxです。ブラウザソースにはインターネット接続が必要です。
-
-## API・情報源の公式ページ
-
-- GDELT DOC API：<https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/>
-- Google News RSS：<https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja>
+1. OBSで「ブラウザソース」を追加します。
+2. URLに <https://harunobushishido-boop.github.io/chat-spam/> を設定します。
+3. 幅を `1980`、高さを `50` にします。
+4. 配信画面の下の隙間に配置します。
 
 ## リポジトリの説明文案
 
-日本語の最新ニュースを複数の取得経路で配信する、OBS向け1980×50pxニュース速報弾幕。GDELTとGoogle News RSSを利用し、5分ごとに自動更新。
+全国12都市の天気予報を自動更新して流す、OBS向け1980×50px天気弾幕。取得日時とAPIデータ時刻を日本時間で区別して表示。
