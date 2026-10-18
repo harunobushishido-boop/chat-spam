@@ -1,49 +1,48 @@
-# Chat Spam｜ライブ配信向け天気予報弾幕
+# Chat Spam｜全国の天気ニュース弾幕
 
-横 **1980 × 縦 50 ピクセル** の、ライブ配信画面の下の隙間に配置する天気予報ティッカーです。ブラウザーで最新データを取得し、現在の天気・気温・体感温度・湿度・降水量・風速と、今日から3日間の予報を右から左へ流して表示します。
+ライブ配信の下の隙間に配置する、横 **1980 × 縦 50 ピクセル** の天気ニュース・ティッカーです。仙台市だけでなく、北海道から沖縄まで全国12都市の現在の天気と予報をまとめ、ニュース見出し風に右から左へ流します。
 
-## GitHub Pages
+## 表示する内容
 
-公開予定URL：<https://harunobushishido-boop.github.io/chat-spam/>
+- 全国12都市の現在の天気・気温
+- 各都市の今日の予想最高気温・最低気温・降水確率
+- 全国の雨・雪の地点数、降水確率40%以上の都市数
+- 予想最高気温・最低気温の都市
+- 10分ごとの自動更新と最終データ時刻
+- 天気の状況に応じた強調表示
 
-初回だけ、GitHubでリポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に設定してください。その後は `.github/workflows/pages.yml` が `main` への更新ごとに公開します。初回デプロイが完了するまでは公開URLでページが表示されない場合があります。
+対象都市：札幌、青森、仙台、新潟、東京、名古屋、大阪、広島、高知、福岡、鹿児島、那覇。日本全国すべての地点ではなく、各地域の代表都市を使った全国概況です。
 
-## 配信ソフトでの使い方
+## GitHub Pages で公開
 
-OBSなどでは「ブラウザソース」を追加し、次のように設定します。
+公開URL：<https://harunobushishido-boop.github.io/chat-spam/>
 
-- URL：<https://harunobushishido-boop.github.io/chat-spam/>
-- 幅：`1980`
-- 高さ：`50`
+初回公開時は、リポジトリの [Settings → Pages](https://github.com/harunobushishido-boop/chat-spam/settings/pages) を開き、**Build and deployment → Source → GitHub Actions** を選択してください。その後、[Actions](https://github.com/harunobushishido-boop/chat-spam/actions) で公開ワークフローが成功していることを確認します。Pagesの初期設定がまだの場合、公開URLは動きません。
 
-配信画面の下の隙間に配置してください。HTMLの高さは常に50pxです。背景は濃紺の半透明バーで、ページ全体の余白はありません。弾幕にマウスカーソルを重ねるとスクロールが一時停止します。
+## OBSなどの配信ソフトで使う
 
-## 表示する地域を変更
+1. 「ブラウザソース」を追加します。
+2. URLに <https://harunobushishido-boop.github.io/chat-spam/> を入力します。
+3. 幅を `1980`、高さを `50` に設定します。
+4. 配信画面の下の隙間へ配置します。
 
-URLに緯度・経度・地域名を付けると、表示地点を変更できます。
+ページ自体に余白はなく、高さは常に50pxです。弾幕の上にマウスを置くとスクロールが一時停止します。
 
-例：東京
-```
-https://harunobushishido-boop.github.io/chat-spam/?city=東京&lat=35.6812&lon=139.7671
-```
+## 天気データ・自動更新
 
-デフォルトは仙台市です。地域名はURLエンコードが必要な場合があります。緯度・経度は10進数で指定してください。
+- API：<https://open-meteo.com/>
+- APIキー不要
+- 10分間隔で最新データを取得
+- ネットワークエラー時は前回の表示を維持し、次回に再取得
+- 日本時間（Asia/Tokyo）を使用
 
-## 天気データ・更新
-
-- 天気データ：<https://open-meteo.com/>
-- APIキーは不要です。
-- ページ表示後、10分ごとに自動更新します。
-- 取得できない場合はエラー表示に切り替え、次回の自動更新で再取得を試みます。
-- ブラウザーがインターネットに接続されている必要があります。
-
-天気データはOpen-Meteoからブラウザーで取得します。配信地域が仙台以外の場合は、上記URLの `city`、`lat`、`lon` を変更してください。
+天気データはOpen-Meteoからブラウザーで取得します。全国概況は代表都市の予報に基づくもので、すべての市区町村の実況を示すものではありません。
 
 ## ファイル
 
-- `index.html`：50px固定高の天気弾幕ページ
-- `.github/workflows/pages.yml`：GitHub Pagesへの自動デプロイ
+- `index.html`：1980×50pxの全国天気ニュース弾幕
+- `.github/workflows/pages.yml`：GitHub Pages自動デプロイ
 
 ## リポジトリの説明文案
 
-横1980×縦50pxのライブ配信向け天気予報弾幕。Open-Meteoから現在の天気と3日間予報を取得し、GitHub Pagesで公開します。
+全国12都市の最新天気をニュース形式で配信する、OBS向け1980×50px天気弾幕。気温・降水確率・地域別予報を10分ごとに自動更新。
