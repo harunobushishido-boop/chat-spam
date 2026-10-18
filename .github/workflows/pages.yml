@@ -1,4 +1,4 @@
-name: Deploy national weather ticker to GitHub Pages
+name: Deploy news ticker to GitHub Pages
 
 on:
   push:
