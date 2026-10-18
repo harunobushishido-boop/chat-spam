@@ -135,7 +135,7 @@
       // Open-Meteoのcurrent.timeはタイムゾーン情報のない現地時刻文字列。
       // Dateに直接渡してタイムゾーン変換すると環境によって時刻がずれるため、文字列として表示する。
       function formatApiDataTime(value) {
-        const match = String(value || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/);
+        const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
         if (!match) return "時刻不明";
         return match[1] + "/" + match[2] + "/" + match[3] + " " + match[4] + ":" + match[5] + " JST";
       }
@@ -144,7 +144,7 @@
       function formatFetchTime(date) {
         const parts = new Intl.DateTimeFormat("ja-JP", {
           timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
-          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
         }).formatToParts(date);
         const p = {};
         parts.forEach(function (part) { if (part.type !== "literal") p[part.type] = part.value; });
