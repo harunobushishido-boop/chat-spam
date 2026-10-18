@@ -307,32 +307,89 @@
         updateScrollSpeed();
       }
 
+      // JSONP版を使うことで、ブラウザーソースのCORS制限を回避する。
+      // GDELT公式APIはJSONP出力に対応している。
+      function requestNewsJsonp(query, timespan, maxrecords) {
+        return new Promise(function (resolve, reject) {
+          const callbackName = "__chatSpamNewsCallback";
+          const previousCallback = window[callbackName];
+          const script = document.createElement("script");
+          const url = new URL(API_URL);
+          let settled = false;
+
+          url.search = new URLSearchParams({
+            query: query,
+            mode: "ArtList",
+            format: "jsonp",
+            callback: callbackName,
+            sort: "DateDesc",
+            timespan: timespan,
+            maxrecords: String(maxrecords)
+          }).toString();
+
+          function finish(error, data) {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeoutId);
+            script.onerror = null;
+            script.onload = null;
+            if (script.parentNode) script.parentNode.removeChild(script);
+            if (previousCallback === undefined) {
+              try { delete window[callbackName]; } catch (ignored) { window[callbackName] = undefined; }
+            } else {
+              window[callbackName] = previousCallback;
+            }
+            if (error) reject(error);
+            else resolve(data);
+          }
+
+          window[callbackName] = function (data) {
+            finish(null, data);
+          };
+          script.async = true;
+          script.src = url.toString();
+          script.onerror = function () {
+            finish(new Error("ニュースAPIへの接続に失敗しました（通信制限・接続エラーの可能性）"));
+          };
+          script.onload = function () {
+            // 正常に読み込めてもコールバックが来なければ、少し待ってタイムアウト扱いにする。
+          };
+          const timeoutId = window.setTimeout(function () {
+            finish(new Error("ニュースAPIの応答がタイムアウトしました"));
+          }, 25000);
+          document.head.appendChild(script);
+        });
+      }
+
       async function fetchNews() {
         if (loading) return;
         loading = true;
-        if (!lastSuccessfulUpdate) status.textContent = "日本語の最新ニュースを取得しています…";
-        const url = new URL(API_URL);
-        url.search = new URLSearchParams({
-          query: "sourcelang:japanese",
-          mode: "ArtList",
-          format: "json",
-          sort: "DateDesc",
-          timespan: "6h",
-          maxrecords: "50"
-        }).toString();
+        if (!lastSuccessfulUpdate) {
+          copyA.innerHTML = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="breaking"><span class="live-dot"></span>最新ニュース</span><span class="status">日本語のニュース速報を取得しています…</span>';
+          copyB.innerHTML = copyA.innerHTML;
+        }
 
-        const controller = new AbortController();
-        const timeout = window.setTimeout(function () { controller.abort(); }, 20000);
+        // まず日本語ニュースのキーワード検索を行い、結果がない場合は日本語配信元全体に切り替える。
+        const requests = [
+          { query: "(japan OR tokyo OR government OR economy OR earthquake OR sports OR business OR entertainment) sourcelang:japanese", timespan: "24h", maxrecords: 30 },
+          { query: "sourcelang:japanese", timespan: "1h", maxrecords: 20 }
+        ];
+        let lastError = null;
         try {
-          const response = await fetch(url.toString(), {
-            cache: "no-store",
-            signal: controller.signal,
-            headers: { "Accept": "application/json" }
-          });
-          if (!response.ok) throw new Error("News API returned HTTP " + response.status);
-          const data = await response.json();
-          const articles = normalizeArticles(data);
-          if (!articles.length) throw new Error("News API returned no usable headlines");
+          let articles = [];
+          for (let i = 0; i < requests.length; i++) {
+            try {
+              const request = requests[i];
+              const data = await requestNewsJsonp(request.query, request.timespan, request.maxrecords);
+              articles = normalizeArticles(data);
+              if (articles.length) break;
+              lastError = new Error("ニュースAPIから記事が返されませんでした");
+            } catch (error) {
+              lastError = error;
+            }
+          }
+
+          if (!articles.length) throw lastError || new Error("ニュースが見つかりませんでした");
           previousArticles = articles;
           lastSuccessfulUpdate = Date.now();
           renderArticles(articles, false);
@@ -340,19 +397,24 @@
           console.error("News update failed:", error);
           if (previousArticles.length) {
             renderArticles(previousArticles, true);
-            const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning">ニュースの更新に失敗しました。前回の見出しを表示中です。</span>';
+            copyA.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+            copyB.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+            const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning">更新に失敗。前回の見出しを表示中です。</span>';
             copyA.insertAdjacentHTML("beforeend", warning);
             copyB.insertAdjacentHTML("beforeend", warning);
           } else {
-            const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="separator"></span><span class="status">ニュースを取得できません。ネット接続を確認しています。</span><span class="source">データ提供：GDELT</span>';
+            const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="separator"></span><span class="status">ニュースを取得できません。20秒後に自動で再試行します。</span><span class="source">接続先：GDELT News API</span>';
             copyA.innerHTML = message;
             copyB.innerHTML = message;
+            window.clearTimeout(retryTimer);
+            retryTimer = window.setTimeout(fetchNews, 20000);
           }
         } finally {
-          window.clearTimeout(timeout);
           loading = false;
         }
       }
+
+      let retryTimer = null;
 
       fetchNews();
       window.setInterval(fetchNews, UPDATE_INTERVAL_MS);
