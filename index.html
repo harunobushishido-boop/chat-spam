@@ -240,8 +240,8 @@
         parts.push('<span class="headline">全国12都市の最新概況</span>');
         parts.push('<span class="item"><span class="label">現在、雨・雪</span><span class="' + (wetNow.length ? 'rain-alert' : '') + '">' + wetNow.length + '都市</span></span>');
         parts.push('<span class="item"><span class="label">きょう降水確率40%以上</span><span class="' + (rainRisk.length ? 'rain-alert' : '') + '">' + rainRisk.length + '都市</span></span>');
-        parts.push('<span class="item"><span class="label">予想最高気温</span><span class="city">' + safe(maxCity.name) + '</span><span class="temperature">' + safe(round(maxCity.daily.temperature_2m_max[0])) + '℃</span></span>');
-        parts.push('<span class="item"><span class="label">予想最低気温</span><span class="city">' + safe(minCity.name) + '</span><span class="temperature">' + safe(round(minCity.daily.temperature_2m_min[0])) + '℃</span></span>');
+        parts.push('<span class="item"><span class="label">予想最高気温</span><span class="city">' + safe(maxCity._city.name) + '</span><span class="temperature">' + safe(round(maxCity.daily.temperature_2m_max[0])) + '℃</span></span>');
+        parts.push('<span class="item"><span class="label">予想最低気温</span><span class="city">' + safe(minCity._city.name) + '</span><span class="temperature">' + safe(round(minCity.daily.temperature_2m_min[0])) + '℃</span></span>');
         if (alertNow.length) {
           parts.push('<span class="item rain-alert"><span>注意：</span><span>' + safe(alertNow.map(function (r) { return r._city.name; }).join("・")) + 'で強い雨・雪・雷の情報</span></span>');
         }
@@ -302,7 +302,9 @@
         } catch (error) {
           console.error("Nationwide weather update failed:", error);
           if (lastSuccessfulUpdate) {
-            const warning = '<span class="separator"></span><span class="status rain-alert">更新に失敗しました。表示中の天気は前回取得時の情報です。</span>';
+            copyA.querySelectorAll(".update-warning").forEach(function (node) { node.remove(); });
+            copyB.querySelectorAll(".update-warning").forEach(function (node) { node.remove(); });
+            const warning = '<span class="separator update-warning"></span><span class="status rain-alert update-warning">更新に失敗しました。表示中の天気は前回取得時の情報です。</span>';
             copyA.insertAdjacentHTML("beforeend", warning);
             copyB.insertAdjacentHTML("beforeend", warning);
           } else {
