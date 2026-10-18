@@ -300,11 +300,77 @@
         parts.push('<span class="updated">' +
           (fromCache ? "更新待機中・前回取得データ" : "最終更新 " + escapeHtml(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Tokyo", hour12: false }))) +
           '／5分ごとに自動更新</span>');
-        parts.push('<span class="source">記事提供元のリンクを表示</span>');
+        parts.push('<span class="source">ニュース提供：' + escapeHtml(currentProvider) + '／記事リンクあり</span>');
         const markup = parts.join("");
         copyA.innerHTML = markup;
         copyB.innerHTML = markup;
         updateScrollSpeed();
+      }
+
+      // GDELTが応答しない場合の第2経路：Google News RSSをCORS対応プロキシ経由で取得する。
+      const GOOGLE_NEWS_RSS = "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja";
+      let currentProvider = "GDELT DOC API";
+
+      function parseRssArticles(xmlText) {
+        const xml = new DOMParser().parseFromString(String(xmlText || ""), "application/xml");
+        if (xml.querySelector("parsererror")) throw new Error("RSSのXMLを解析できませんでした");
+        const items = Array.from(xml.querySelectorAll("item"));
+        const articles = items.map(function (item) {
+          const titleNode = item.querySelector("title");
+          const linkNode = item.querySelector("link");
+          const dateNode = item.querySelector("pubDate");
+          const sourceNode = item.querySelector("source");
+          const title = titleNode ? titleNode.textContent.trim() : "";
+          const url = safeArticleUrl(linkNode ? linkNode.textContent.trim() : "");
+          let domain = sourceNode ? sourceNode.textContent.trim() : "";
+          if (!domain && url) {
+            try { domain = new URL(url).hostname.replace(/^www\./i, ""); } catch (ignored) {}
+          }
+          return {
+            title: title,
+            url: url,
+            domain: domain || "Google News",
+            seendate: dateNode ? dateNode.textContent.trim() : "",
+            language: "ja"
+          };
+        }).filter(function (item) { return item.title.length > 0 && item.url.length > 0; });
+        const seen = new Set();
+        return articles.filter(function (item) {
+          const key = articleKey(item);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, MAX_HEADLINES);
+      }
+
+      async function fetchGoogleNewsRss() {
+        const rssUrl = GOOGLE_NEWS_RSS;
+
+        // Proxy A returns a JSON envelope containing the RSS as text.
+        try {
+          const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(rssUrl) + "&disableCache=true";
+          const response = await fetch(proxyUrl, { cache: "no-store" });
+          if (!response.ok) throw new Error("Google News RSS proxy returned HTTP " + response.status);
+          const envelope = await response.json();
+          const articles = parseRssArticles(envelope && envelope.contents);
+          if (articles.length) {
+            currentProvider = "Google News RSS";
+            return articles;
+          }
+          throw new Error("Google News RSS did not contain usable items");
+        } catch (firstError) {
+          console.warn("Google News RSS primary proxy failed:", firstError);
+        }
+
+        // Proxy B returns RSS text directly if the first proxy is unavailable.
+        const proxyUrl = "https://corsproxy.io/?url=" + encodeURIComponent(rssUrl);
+        const response = await fetch(proxyUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error("Google News RSS backup proxy returned HTTP " + response.status);
+        const xmlText = await response.text();
+        const articles = parseRssArticles(xmlText);
+        if (!articles.length) throw new Error("Google News RSS backup returned no usable headlines");
+        currentProvider = "Google News RSS";
+        return articles;
       }
 
       // JSONP版を使うことで、ブラウザーソースのCORS制限を回避する。
@@ -394,20 +460,28 @@
           lastSuccessfulUpdate = Date.now();
           renderArticles(articles, false);
         } catch (error) {
-          console.error("News update failed:", error);
-          if (previousArticles.length) {
-            renderArticles(previousArticles, true);
-            copyA.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
-            copyB.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
-            const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning">更新に失敗。前回の見出しを表示中です。</span>';
-            copyA.insertAdjacentHTML("beforeend", warning);
-            copyB.insertAdjacentHTML("beforeend", warning);
-          } else {
-            const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="separator"></span><span class="status">ニュースを取得できません。20秒後に自動で再試行します。</span><span class="source">接続先：GDELT News API</span>';
-            copyA.innerHTML = message;
-            copyB.innerHTML = message;
-            window.clearTimeout(retryTimer);
-            retryTimer = window.setTimeout(fetchNews, 20000);
+          console.error("GDELT news update failed; trying Google News RSS:", error);
+          try {
+            const backupArticles = await fetchGoogleNewsRss();
+            previousArticles = backupArticles;
+            lastSuccessfulUpdate = Date.now();
+            renderArticles(backupArticles, false);
+          } catch (backupError) {
+            console.error("All news sources failed:", backupError);
+            if (previousArticles.length) {
+              renderArticles(previousArticles, true);
+              copyA.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+              copyB.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+              const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning">更新失敗。前回ニュースを表示中です。</span>';
+              copyA.insertAdjacentHTML("beforeend", warning);
+              copyB.insertAdjacentHTML("beforeend", warning);
+            } else {
+              const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="separator"></span><span class="status">ニュースAPIに接続できません。通信制限や接続を確認中です。</span><span class="source">GDELT・Google News RSSを試行済み</span>';
+              copyA.innerHTML = message;
+              copyB.innerHTML = message;
+              window.clearTimeout(retryTimer);
+              retryTimer = window.setTimeout(fetchNews, 20000);
+            }
           }
         } finally {
           loading = false;
