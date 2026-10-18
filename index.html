@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="GitHub Actionsが定期取得する日本語ニュースを流す、ライブ配信・OBS向け1980×50pxニュース速報弾幕。">
+  <meta name="description" content="GitHub Actionsが定期取得する日本語ニュースの見出しと時刻だけを流す、ライブ配信・OBS向け1980×50pxニュース速報弾幕。">
   <title>ニュース速報弾幕 | Chat Spam</title>
   <style>
     :root {
@@ -151,7 +151,6 @@
             parts.push('<span class="item">' +
               '<span class="time">' + escapeHtml(formatTime(article.publishedAt)) + '</span>' +
               '<a class="headline" href="' + escapeHtml(article.url) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</a>' +
-              '<span class="source">' + escapeHtml(article.source || article.domain || "") + '</span>' +
               '</span>');
           });
         } else {
@@ -164,7 +163,6 @@
         }
         parts.push('<span class="updated">取得 ' + escapeHtml(formatTime(data && data.updatedAt)) + ' JST</span>');
         parts.push('<span class="updated">GitHub確認 ' + escapeHtml(formatTime(data && data.checkedAt)) + ' JST</span>');
-        parts.push('<span class="source">データ：' + escapeHtml(data && data.source || "ニュース取得元") + '</span>');
 
         const markup = parts.join("");
         copyA.innerHTML = markup;
