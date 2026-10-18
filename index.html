@@ -4,494 +4,273 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071426">
-  <meta name="description" content="日本語の最新ニュースを自動取得して流す、ライブ配信・OBS向け1980×50pxニュース速報弾幕。">
-  <title>ニュース速報弾幕 | Chat Spam</title>
+  <meta name="description" content="全国12都市の最新天気予報を自動取得して流す、ライブ配信・OBS向け1980×50px天気弾幕。">
+  <title>全国の天気予報弾幕 | Chat Spam</title>
   <style>
     :root {
       color-scheme: dark;
-      --bar-bg: rgba(5, 12, 24, .97);
-      --bar-line: rgba(105, 177, 234, .42);
-      --text: #f4f7fc;
-      --muted: #a9bbd2;
-      --accent: #8bd7ff;
-      --breaking: #ff3f52;
-      --gold: #ffd166;
+      --bar-bg: rgba(5, 16, 31, .97);
+      --bar-line: rgba(100, 190, 255, .38);
+      --text: #f3f8ff;
+      --muted: #aac3dd;
+      --accent: #71ddff;
+      --warm: #ffd166;
+      --alert: #ffad9e;
     }
     * { box-sizing: border-box; }
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 50px;
-      min-height: 50px;
-      overflow: hidden;
-      background: transparent;
+      margin: 0; padding: 0; width: 100%; height: 50px; min-height: 50px;
+      overflow: hidden; background: transparent;
       font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif;
     }
     body { color: var(--text); }
-    .news-bar {
-      position: relative;
-      display: flex;
-      align-items: center;
-      width: 100%;
-      height: 50px;
-      overflow: hidden;
-      isolation: isolate;
-      background: var(--bar-bg);
-      border-top: 1px solid var(--bar-line);
-      border-bottom: 1px solid var(--bar-line);
+    .weather-bar {
+      position: relative; display: flex; align-items: center; width: 100%; height: 50px;
+      overflow: hidden; isolation: isolate; background: var(--bar-bg);
+      border-top: 1px solid var(--bar-line); border-bottom: 1px solid var(--bar-line);
       box-shadow: 0 2px 14px rgba(0, 0, 0, .25);
     }
-    .news-bar::before, .news-bar::after {
-      content: "";
-      position: absolute;
-      z-index: 3;
-      top: 0;
-      bottom: 0;
-      width: 28px;
-      pointer-events: none;
+    .weather-bar::before, .weather-bar::after {
+      content: ""; position: absolute; z-index: 2; top: 0; bottom: 0; width: 30px; pointer-events: none;
     }
-    .news-bar::before {
-      left: 0;
-      background: linear-gradient(90deg, rgba(5,12,24,1), rgba(5,12,24,0));
-    }
-    .news-bar::after {
-      right: 0;
-      background: linear-gradient(270deg, rgba(5,12,24,1), rgba(5,12,24,0));
-    }
+    .weather-bar::before { left: 0; background: linear-gradient(90deg, rgba(5,16,31,1), rgba(5,16,31,0)); }
+    .weather-bar::after { right: 0; background: linear-gradient(270deg, rgba(5,16,31,1), rgba(5,16,31,0)); }
     .track {
-      display: flex;
-      flex: 0 0 auto;
-      align-items: center;
-      width: max-content;
-      min-width: max-content;
-      height: 100%;
-      animation: ticker-scroll 150s linear infinite;
-      will-change: transform;
+      display: flex; flex: 0 0 auto; align-items: center; width: max-content; min-width: max-content;
+      height: 100%; animation: ticker-scroll 120s linear infinite; will-change: transform;
     }
-    .news-bar:hover .track { animation-play-state: paused; }
+    .weather-bar:hover .track { animation-play-state: paused; }
     .ticker-copy {
-      display: flex;
-      flex: 0 0 auto;
-      align-items: center;
-      gap: 22px;
-      height: 100%;
-      padding: 0 22px;
-      white-space: nowrap;
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1;
+      display: flex; flex: 0 0 auto; align-items: center; gap: 23px; height: 100%;
+      padding: 0 22px; white-space: nowrap; font-size: 16px; font-weight: 700; line-height: 1;
     }
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--accent);
-      font-size: 16px;
-      font-weight: 950;
-      letter-spacing: .05em;
-    }
+    .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-size: 16px; font-weight: 950; letter-spacing: .055em; }
     .brand-icon {
-      display: inline-grid;
-      place-items: center;
-      width: 29px;
-      height: 29px;
-      border-radius: 7px;
-      background: linear-gradient(145deg, #1d4679, #167e9b);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.17);
-      font-size: 16px;
+      display: inline-grid; place-items: center; width: 29px; height: 29px; border-radius: 8px;
+      background: linear-gradient(135deg, #174a85, #167c9e); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); font-size: 18px;
     }
-    .breaking {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 9px;
-      border-radius: 4px;
-      background: var(--breaking);
-      color: white;
-      font-size: 13px;
-      font-weight: 950;
-      letter-spacing: .035em;
-    }
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: currentColor;
-      box-shadow: 0 0 7px currentColor;
-      animation: live-pulse 1.5s ease-in-out infinite;
-    }
-    .item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      max-width: 980px;
-    }
-    .separator {
-      display: inline-block;
-      width: 1px;
-      height: 22px;
-      background: linear-gradient(transparent, rgba(130,178,220,.55), transparent);
-    }
-    .time {
-      color: var(--gold);
-      font-size: 13px;
-      font-weight: 900;
-      font-variant-numeric: tabular-nums;
-    }
-    .headline {
-      color: #f3f7ff;
-      font-weight: 750;
-      text-decoration: none;
-    }
-    .headline:hover { color: var(--accent); }
-    .source {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 650;
-    }
-    .updated {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .status {
-      color: #dce9f8;
-      font-size: 14px;
-      font-weight: 650;
-    }
-    .muted { color: var(--muted); }
-    @keyframes ticker-scroll {
-      from { transform: translateX(0); }
-      to { transform: translateX(-50%); }
-    }
-    @keyframes live-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: .35; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .track { animation-duration: 240s; }
-      .live-dot { animation: none; }
-    }
+    .breaking { color: #071426; background: var(--warm); border-radius: 4px; padding: 6px 9px; font-size: 13px; font-weight: 950; letter-spacing: .04em; }
+    .item { display: inline-flex; align-items: center; gap: 7px; }
+    .separator { display: inline-block; width: 1px; height: 22px; background: linear-gradient(transparent, rgba(130,178,220,.55), transparent); }
+    .region { color: var(--accent); font-weight: 900; }
+    .city { color: #d7eaff; }
+    .condition-icon { font-size: 22px; }
+    .temperature { color: var(--warm); font-size: 19px; font-weight: 950; }
+    .forecast-temp { color: var(--warm); }
+    .label { color: var(--muted); font-size: 12px; font-weight: 650; }
+    .rain-alert { color: var(--alert); }
+    .updated { color: #e7f0fb; font-size: 12px; font-weight: 700; }
+    .source { color: #8ba9c7; font-size: 11px; font-weight: 500; }
+    .status { color: #d5e7f8; font-size: 14px; font-weight: 650; }
+    @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) { .track { animation-duration: 240s; } }
   </style>
 </head>
 <body>
-  <main class="news-bar" aria-label="最新ニュース速報">
+  <main class="weather-bar" aria-label="全国の最新天気予報">
     <div class="track" id="track">
       <div class="ticker-copy" id="copy-a">
-        <span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>
-        <span class="breaking"><span class="live-dot"></span>最新ニュース</span>
-        <span class="status" id="status">最新ニュースを取得しています…</span>
+        <span class="brand"><span class="brand-icon">☁</span> WEATHER JAPAN</span>
+        <span class="breaking">全国の天気予報</span>
+        <span class="status" id="status">最新の天気予報を取得しています…</span>
       </div>
       <div class="ticker-copy" id="copy-b" aria-hidden="true">
-        <span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>
-        <span class="breaking"><span class="live-dot"></span>最新ニュース</span>
-        <span class="status">最新ニュースを取得しています…</span>
+        <span class="brand"><span class="brand-icon">☁</span> WEATHER JAPAN</span>
+        <span class="breaking">全国の天気予報</span>
+        <span class="status">最新の天気予報を取得しています…</span>
       </div>
     </div>
   </main>
   <script>
     (function () {
       "use strict";
-      const API_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
-      const UPDATE_INTERVAL_MS = 5 * 60 * 1000;
-      const MAX_HEADLINES = 30;
+      const API_URL = "https://api.open-meteo.com/v1/forecast";
+      const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+      const cities = [
+        { name: "札幌", region: "北海道", lat: 43.0642, lon: 141.3469 },
+        { name: "青森", region: "東北", lat: 40.8246, lon: 140.7406 },
+        { name: "仙台", region: "東北", lat: 38.2682, lon: 140.8721 },
+        { name: "新潟", region: "北陸", lat: 37.9026, lon: 139.0236 },
+        { name: "東京", region: "関東", lat: 35.6762, lon: 139.6503 },
+        { name: "名古屋", region: "東海", lat: 35.1815, lon: 136.9066 },
+        { name: "大阪", region: "近畿", lat: 34.6937, lon: 135.5023 },
+        { name: "広島", region: "中国", lat: 34.3853, lon: 132.4553 },
+        { name: "高知", region: "四国", lat: 33.5597, lon: 133.5311 },
+        { name: "福岡", region: "九州", lat: 33.5902, lon: 130.4017 },
+        { name: "鹿児島", region: "九州", lat: 31.5966, lon: 130.5571 },
+        { name: "那覇", region: "沖縄", lat: 26.2124, lon: 127.6809 }
+      ];
       const copyA = document.getElementById("copy-a");
       const copyB = document.getElementById("copy-b");
       const track = document.getElementById("track");
       const status = document.getElementById("status");
-      let lastSuccessfulUpdate = null;
       let loading = false;
-      let previousArticles = [];
+      let lastSuccessfulFetch = null;
+      let lastDataTime = "";
 
-      function escapeHtml(value) {
-        return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+      const weatherText = {
+        0: ["快晴", "☀️"], 1: ["おおむね晴れ", "🌤️"], 2: ["晴れ時々くもり", "⛅"], 3: ["くもり", "☁️"],
+        45: ["霧", "🌫️"], 48: ["霧氷を伴う霧", "🌫️"],
+        51: ["弱い霧雨", "🌦️"], 53: ["霧雨", "🌦️"], 55: ["強い霧雨", "🌧️"],
+        56: ["凍る弱い霧雨", "🌧️"], 57: ["凍る霧雨", "🌧️"],
+        61: ["弱い雨", "🌦️"], 63: ["雨", "🌧️"], 65: ["強い雨", "🌧️"],
+        66: ["凍雨", "🌧️"], 67: ["強い凍雨", "🌧️"],
+        71: ["弱い雪", "🌨️"], 73: ["雪", "❄️"], 75: ["強い雪", "❄️"], 77: ["雪粒", "🌨️"],
+        80: ["弱いにわか雨", "🌦️"], 81: ["にわか雨", "🌧️"], 82: ["強いにわか雨", "⛈️"],
+        85: ["弱いにわか雪", "🌨️"], 86: ["強いにわか雪", "❄️"],
+        95: ["雷雨", "⛈️"], 96: ["ひょうを伴う雷雨", "⛈️"], 99: ["強い雷雨・ひょう", "⛈️"]
+      };
+      function safe(value) {
+        return String(value == null ? "—" : value).replace(/[&<>"']/g, function (c) {
           return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
         });
       }
+      function weather(code) { return weatherText[Number(code)] || ["天気情報", "🌤️"]; }
+      function num(value) {
+        return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : null;
+      }
+      function rounded(value) { const n = num(value); return n === null ? "—" : Math.round(n); }
+      function pad(value) { return String(value).padStart(2, "0"); }
 
-      function safeArticleUrl(value) {
-        try {
-          const url = new URL(String(value || ""));
-          if (url.protocol === "https:" || url.protocol === "http:") return url.href;
-        } catch (error) {}
-        return "";
+      // Open-Meteoのcurrent.timeはタイムゾーン情報のない現地時刻文字列。
+      // Dateに直接渡してタイムゾーン変換すると環境によって時刻がずれるため、文字列として表示する。
+      function formatApiDataTime(value) {
+        const match = String(value || "").match(/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/);
+        if (!match) return "時刻不明";
+        return match[1] + "/" + match[2] + "/" + match[3] + " " + match[4] + ":" + match[5] + " JST";
       }
 
-      function parseGdeltDate(value) {
-        if (!value) return null;
-        const text = String(value);
-        const match = text.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
-        if (match) {
-          return new Date(Date.UTC(
-            Number(match[1]), Number(match[2]) - 1, Number(match[3]),
-            Number(match[4]), Number(match[5]), Number(match[6])
-          ));
-        }
-        const date = new Date(text);
-        return Number.isNaN(date.getTime()) ? null : date;
+      // 取得日時はAPI応答を受け取った瞬間の時刻。APIデータ時刻とは別に計測する。
+      function formatFetchTime(date) {
+        const parts = new Intl.DateTimeFormat("ja-JP", {
+          timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+        }).formatToParts(date);
+        const p = {};
+        parts.forEach(function (part) { if (part.type !== "literal") p[part.type] = part.value; });
+        return p.year + "/" + p.month + "/" + p.day + " " + p.hour + ":" + p.minute + ":" + p.second + " JST";
       }
 
-      function timeLabel(value) {
-        const date = parseGdeltDate(value);
-        if (!date) return "最新";
-        return date.toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Asia/Tokyo",
-          hour12: false
+      function isRainOrSnow(code) {
+        return [51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99].includes(Number(code));
+      }
+      function isSevere(code) { return [65,67,75,82,86,95,96,99].includes(Number(code)); }
+
+      function buildMarkup(results) {
+        const valid = results.filter(function (r) { return r && r.current && r.daily && r.daily.time; });
+        if (valid.length !== cities.length) throw new Error("全国天気データが一部不足しています");
+
+        const wetNow = valid.filter(function (r) { return isRainOrSnow(r.current.weather_code); });
+        const rainRisk = valid.filter(function (r) {
+          const value = num(r.daily.precipitation_probability_max && r.daily.precipitation_probability_max[0]);
+          return value !== null && value >= 40;
         });
-      }
+        const severe = valid.filter(function (r) { return isSevere(r.current.weather_code); });
+        const high = valid.slice().sort(function (a, b) {
+          return (num(b.daily.temperature_2m_max[0]) ?? -999) - (num(a.daily.temperature_2m_max[0]) ?? -999);
+        })[0];
+        const low = valid.slice().sort(function (a, b) {
+          return (num(a.daily.temperature_2m_min[0]) ?? 999) - (num(b.daily.temperature_2m_min[0]) ?? 999);
+        })[0];
 
-      function articleKey(article) {
-        return String(article.url || "").trim().toLowerCase() ||
-          String(article.title || "").trim().toLowerCase();
-      }
-
-      function normalizeArticles(data) {
-        const list = data && Array.isArray(data.articles) ? data.articles : [];
-        const seen = new Set();
-        return list.map(function (item) {
-          return {
-            title: String(item.title || "").replace(/\s+/g, " ").trim(),
-            url: safeArticleUrl(item.url),
-            domain: String(item.domain || "").replace(/^www\./i, "").trim(),
-            seendate: item.seendate || "",
-            language: item.language || ""
-          };
-        }).filter(function (item) {
-          if (!item.title || !item.url) return false;
-          if (item.title.length < 8) return false;
-          const key = articleKey(item);
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }).slice(0, MAX_HEADLINES);
-      }
-
-      function makeArticleMarkup(article) {
-        const title = article.title.length > 180 ? article.title.slice(0, 177) + "…" : article.title;
-        const domain = article.domain || "ニュース配信元";
-        return '<span class="item">' +
-          '<span class="time">' + escapeHtml(timeLabel(article.seendate)) + '</span>' +
-          '<a class="headline" href="' + escapeHtml(article.url) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</a>' +
-          '<span class="source">' + escapeHtml(domain) + '</span>' +
-          '</span>';
-      }
-
-      function updateScrollSpeed() {
-        requestAnimationFrame(function () {
-          const width = copyA.getBoundingClientRect().width;
-          // 実際の文字数に合わせ、急に速すぎないスクロールにする
-          track.style.animationDuration = Math.max(90, Math.min(260, width / 70)) + "s";
-        });
-      }
-
-      function renderArticles(articles, fromCache) {
         const parts = [];
-        parts.push('<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span>');
-        parts.push('<span class="breaking"><span class="live-dot"></span>最新ニュース</span>');
+        parts.push('<span class="brand"><span class="brand-icon">☁</span> WEATHER JAPAN</span>');
+        parts.push('<span class="breaking">全国の天気予報</span>');
         parts.push('<span class="separator"></span>');
-        articles.forEach(function (article, index) {
-          if (index > 0) parts.push('<span class="separator"></span>');
-          parts.push(makeArticleMarkup(article));
+        parts.push('<span class="item"><span class="label">現在雨・雪</span><span class="' + (wetNow.length ? 'rain-alert' : '') + '">' + wetNow.length + '都市</span></span>');
+        parts.push('<span class="item"><span class="label">今日の降水確率40%以上</span><span class="' + (rainRisk.length ? 'rain-alert' : '') + '">' + rainRisk.length + '都市</span></span>');
+        parts.push('<span class="item"><span class="label">予想最高</span><span class="city">' + safe(high._city.name) + '</span><span class="temperature">' + safe(rounded(high.daily.temperature_2m_max[0])) + '℃</span></span>');
+        parts.push('<span class="item"><span class="label">予想最低</span><span class="city">' + safe(low._city.name) + '</span><span class="temperature">' + safe(rounded(low.daily.temperature_2m_min[0])) + '℃</span></span>');
+        if (severe.length) {
+          parts.push('<span class="item rain-alert"><span>注意：</span><span>' + safe(severe.map(function (r) { return r._city.name; }).join("・")) + 'で強い雨・雪・雷の予報</span></span>');
+        }
+
+        const regions = ["北海道", "東北", "北陸", "関東", "東海", "近畿", "中国", "四国", "九州", "沖縄"];
+        regions.forEach(function (region) {
+          const list = valid.filter(function (r) { return r._city.region === region; });
+          if (!list.length) return;
+          parts.push('<span class="separator"></span><span class="region">【' + safe(region) + '】</span>');
+          list.forEach(function (r) {
+            const w = weather(r.current.weather_code);
+            const probability = num(r.daily.precipitation_probability_max[0]);
+            const rainClass = (probability !== null && probability >= 50) || isSevere(r.current.weather_code) ? " rain-alert" : "";
+            parts.push('<span class="item"><span class="city">' + safe(r._city.name) + '</span><span class="condition-icon">' + w[1] + '</span><span>' + safe(w[0]) + '</span><span class="temperature">' + safe(rounded(r.current.temperature_2m)) + '℃</span><span class="label">最高' + safe(rounded(r.daily.temperature_2m_max[0])) + '°／最低' + safe(rounded(r.daily.temperature_2m_min[0])) + '°</span><span class="label' + rainClass + '">降水' + safe(rounded(probability)) + '%</span></span>');
+          });
         });
         parts.push('<span class="separator"></span>');
-        parts.push('<span class="updated">' +
-          (fromCache ? "更新待機中・前回取得データ" : "最終更新 " + escapeHtml(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Tokyo", hour12: false }))) +
-          '／5分ごとに自動更新</span>');
-        parts.push('<span class="source">ニュース提供：' + escapeHtml(currentProvider) + '／記事リンクあり</span>');
+        parts.push('<span class="updated">取得日時 ' + safe(formatFetchTime(lastSuccessfulFetch)) + '</span>');
+        parts.push('<span class="label">APIデータ時刻 ' + safe(formatApiDataTime(lastDataTime)) + '</span>');
+        parts.push('<span class="source">天気データ：Open-Meteo／10分ごとに更新確認</span>');
+
         const markup = parts.join("");
         copyA.innerHTML = markup;
         copyB.innerHTML = markup;
-        updateScrollSpeed();
-      }
-
-      // GDELTが応答しない場合の第2経路：Google News RSSをCORS対応プロキシ経由で取得する。
-      const GOOGLE_NEWS_RSS = "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja";
-      let currentProvider = "GDELT DOC API";
-
-      function parseRssArticles(xmlText) {
-        const xml = new DOMParser().parseFromString(String(xmlText || ""), "application/xml");
-        if (xml.querySelector("parsererror")) throw new Error("RSSのXMLを解析できませんでした");
-        const items = Array.from(xml.querySelectorAll("item"));
-        const articles = items.map(function (item) {
-          const titleNode = item.querySelector("title");
-          const linkNode = item.querySelector("link");
-          const dateNode = item.querySelector("pubDate");
-          const sourceNode = item.querySelector("source");
-          const title = titleNode ? titleNode.textContent.trim() : "";
-          const url = safeArticleUrl(linkNode ? linkNode.textContent.trim() : "");
-          let domain = sourceNode ? sourceNode.textContent.trim() : "";
-          if (!domain && url) {
-            try { domain = new URL(url).hostname.replace(/^www\./i, ""); } catch (ignored) {}
-          }
-          return {
-            title: title,
-            url: url,
-            domain: domain || "Google News",
-            seendate: dateNode ? dateNode.textContent.trim() : "",
-            language: "ja"
-          };
-        }).filter(function (item) { return item.title.length > 0 && item.url.length > 0; });
-        const seen = new Set();
-        return articles.filter(function (item) {
-          const key = articleKey(item);
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        }).slice(0, MAX_HEADLINES);
-      }
-
-      async function fetchGoogleNewsRss() {
-        const rssUrl = GOOGLE_NEWS_RSS;
-
-        // Proxy A returns a JSON envelope containing the RSS as text.
-        try {
-          const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(rssUrl) + "&disableCache=true";
-          const response = await fetch(proxyUrl, { cache: "no-store" });
-          if (!response.ok) throw new Error("Google News RSS proxy returned HTTP " + response.status);
-          const envelope = await response.json();
-          const articles = parseRssArticles(envelope && envelope.contents);
-          if (articles.length) {
-            currentProvider = "Google News RSS";
-            return articles;
-          }
-          throw new Error("Google News RSS did not contain usable items");
-        } catch (firstError) {
-          console.warn("Google News RSS primary proxy failed:", firstError);
-        }
-
-        // Proxy B returns RSS text directly if the first proxy is unavailable.
-        const proxyUrl = "https://corsproxy.io/?url=" + encodeURIComponent(rssUrl);
-        const response = await fetch(proxyUrl, { cache: "no-store" });
-        if (!response.ok) throw new Error("Google News RSS backup proxy returned HTTP " + response.status);
-        const xmlText = await response.text();
-        const articles = parseRssArticles(xmlText);
-        if (!articles.length) throw new Error("Google News RSS backup returned no usable headlines");
-        currentProvider = "Google News RSS";
-        return articles;
-      }
-
-      // JSONP版を使うことで、ブラウザーソースのCORS制限を回避する。
-      // GDELT公式APIはJSONP出力に対応している。
-      function requestNewsJsonp(query, timespan, maxrecords) {
-        return new Promise(function (resolve, reject) {
-          const callbackName = "__chatSpamNewsCallback";
-          const previousCallback = window[callbackName];
-          const script = document.createElement("script");
-          const url = new URL(API_URL);
-          let settled = false;
-
-          url.search = new URLSearchParams({
-            query: query,
-            mode: "ArtList",
-            format: "jsonp",
-            callback: callbackName,
-            sort: "DateDesc",
-            timespan: timespan,
-            maxrecords: String(maxrecords)
-          }).toString();
-
-          function finish(error, data) {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timeoutId);
-            script.onerror = null;
-            script.onload = null;
-            if (script.parentNode) script.parentNode.removeChild(script);
-            if (previousCallback === undefined) {
-              try { delete window[callbackName]; } catch (ignored) { window[callbackName] = undefined; }
-            } else {
-              window[callbackName] = previousCallback;
-            }
-            if (error) reject(error);
-            else resolve(data);
-          }
-
-          window[callbackName] = function (data) {
-            finish(null, data);
-          };
-          script.async = true;
-          script.src = url.toString();
-          script.onerror = function () {
-            finish(new Error("ニュースAPIへの接続に失敗しました（通信制限・接続エラーの可能性）"));
-          };
-          script.onload = function () {
-            // 正常に読み込めてもコールバックが来なければ、少し待ってタイムアウト扱いにする。
-          };
-          const timeoutId = window.setTimeout(function () {
-            finish(new Error("ニュースAPIの応答がタイムアウトしました"));
-          }, 25000);
-          document.head.appendChild(script);
+        status.textContent = "全国の天気を表示中";
+        requestAnimationFrame(function () {
+          const width = copyA.getBoundingClientRect().width;
+          track.style.animationDuration = Math.max(70, Math.min(180, width / 26)) + "s";
         });
       }
 
-      async function fetchNews() {
+      async function fetchWeather() {
         if (loading) return;
         loading = true;
-        if (!lastSuccessfulUpdate) {
-          copyA.innerHTML = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="breaking"><span class="live-dot"></span>最新ニュース</span><span class="status">日本語のニュース速報を取得しています…</span>';
+        if (!lastSuccessfulFetch) {
+          copyA.innerHTML = '<span class="brand"><span class="brand-icon">☁</span> WEATHER JAPAN</span><span class="breaking">全国の天気予報</span><span class="status">最新の天気予報を取得しています…</span>';
           copyB.innerHTML = copyA.innerHTML;
         }
+        const url = new URL(API_URL);
+        url.search = new URLSearchParams({
+          latitude: cities.map(function (c) { return c.lat; }).join(","),
+          longitude: cities.map(function (c) { return c.lon; }).join(","),
+          current: "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",
+          daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+          forecast_days: "2",
+          timezone: "Asia/Tokyo"
+        }).toString();
 
-        // まず日本語ニュースのキーワード検索を行い、結果がない場合は日本語配信元全体に切り替える。
-        const requests = [
-          { query: "(japan OR tokyo OR government OR economy OR earthquake OR sports OR business OR entertainment) sourcelang:japanese", timespan: "24h", maxrecords: 30 },
-          { query: "sourcelang:japanese", timespan: "1h", maxrecords: 20 }
-        ];
-        let lastError = null;
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(function () { controller.abort(); }, 20000);
         try {
-          let articles = [];
-          for (let i = 0; i < requests.length; i++) {
-            try {
-              const request = requests[i];
-              const data = await requestNewsJsonp(request.query, request.timespan, request.maxrecords);
-              articles = normalizeArticles(data);
-              if (articles.length) break;
-              lastError = new Error("ニュースAPIから記事が返されませんでした");
-            } catch (error) {
-              lastError = error;
-            }
+          const response = await fetch(url.toString(), { cache: "no-store", signal: controller.signal });
+          if (!response.ok) throw new Error("Open-Meteo HTTP " + response.status);
+          const payload = await response.json();
+          const results = Array.isArray(payload) ? payload : [payload];
+          if (results.length !== cities.length) throw new Error("APIから返された地点数が一致しません");
+          results.forEach(function (result, index) { result._city = cities[index]; });
+          if (results.some(function (r) { return !r || !r.current || !r.daily || !r.current.time; })) {
+            throw new Error("天気データが一部不足しています");
           }
 
-          if (!articles.length) throw lastError || new Error("ニュースが見つかりませんでした");
-          previousArticles = articles;
-          lastSuccessfulUpdate = Date.now();
-          renderArticles(articles, false);
+          // Date.now()を取得時刻として保存し、APIのdata timeと混同しない。
+          const receivedAt = new Date();
+          lastDataTime = results[0].current.time;
+          lastSuccessfulFetch = receivedAt;
+          buildMarkup(results);
         } catch (error) {
-          console.error("GDELT news update failed; trying Google News RSS:", error);
-          try {
-            const backupArticles = await fetchGoogleNewsRss();
-            previousArticles = backupArticles;
-            lastSuccessfulUpdate = Date.now();
-            renderArticles(backupArticles, false);
-          } catch (backupError) {
-            console.error("All news sources failed:", backupError);
-            if (previousArticles.length) {
-              renderArticles(previousArticles, true);
-              copyA.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
-              copyB.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
-              const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning">更新失敗。前回ニュースを表示中です。</span>';
-              copyA.insertAdjacentHTML("beforeend", warning);
-              copyB.insertAdjacentHTML("beforeend", warning);
-            } else {
-              const message = '<span class="brand"><span class="brand-icon">N</span> NEWS FLASH</span><span class="separator"></span><span class="status">ニュースAPIに接続できません。通信制限や接続を確認中です。</span><span class="source">GDELT・Google News RSSを試行済み</span>';
-              copyA.innerHTML = message;
-              copyB.innerHTML = message;
-              window.clearTimeout(retryTimer);
-              retryTimer = window.setTimeout(fetchNews, 20000);
-            }
+          console.error("Weather update failed:", error);
+          if (lastSuccessfulFetch) {
+            copyA.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+            copyB.querySelectorAll(".refresh-warning").forEach(function (node) { node.remove(); });
+            const warning = '<span class="separator refresh-warning"></span><span class="status refresh-warning rain-alert">更新失敗：前回の天気データを表示中</span>';
+            copyA.insertAdjacentHTML("beforeend", warning);
+            copyB.insertAdjacentHTML("beforeend", warning);
+          } else {
+            const message = '<span class="brand"><span class="brand-icon">☁</span> WEATHER JAPAN</span><span class="separator"></span><span class="status">天気を取得できません。ネット接続を確認し、20秒後に再試行します。</span><span class="source">データ提供：Open-Meteo</span>';
+            copyA.innerHTML = message;
+            copyB.innerHTML = message;
+            window.clearTimeout(retryTimer);
+            retryTimer = window.setTimeout(fetchWeather, 20000);
           }
         } finally {
+          window.clearTimeout(timeoutId);
           loading = false;
         }
       }
 
       let retryTimer = null;
-
-      fetchNews();
-      window.setInterval(fetchNews, UPDATE_INTERVAL_MS);
+      fetchWeather();
+      window.setInterval(fetchWeather, UPDATE_INTERVAL_MS);
     }());
   </script>
 </body>
